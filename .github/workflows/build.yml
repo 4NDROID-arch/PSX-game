@@ -1,0 +1,48 @@
+name: Build VIZO PS1 Game
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build wget unzip
+
+      - name: Install PSn00bSDK
+        run: |
+          wget -O psn00bsdk.zip https://github.com/Lameguy64/PSn00bSDK/releases/download/v0.24/PSn00bSDK-0.24-Linux.zip
+          mkdir -p "$HOME/psn00bsdk"
+          unzip -q psn00bsdk.zip -d "$HOME/psn00bsdk"
+          SDK_DIR="$(find "$HOME/psn00bsdk" -type d -path '*/lib/libpsn00b' | head -n 1)"
+          if [ -z "$SDK_DIR" ]; then
+            echo "Could not locate PSn00bSDK lib/libpsn00b folder"
+            find "$HOME/psn00bsdk" -maxdepth 3 -type d
+            exit 1
+          fi
+          echo "PSN00BSDK_LIBS=$SDK_DIR" >> "$GITHUB_ENV"
+          BIN_DIR="$(dirname "$(dirname "$SDK_DIR")")/bin"
+          echo "$BIN_DIR" >> "$GITHUB_PATH"
+
+      - name: Configure
+        run: cmake --preset default
+
+      - name: Build
+        run: cmake --build build --verbose
+
+      - name: Upload PS1 executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: VIZO-TOPDOWN-SHOOTER-PS1-EXECUTABLE
+          path: |
+            build/*.exe
+            build/*.elf
+            build/*.map
